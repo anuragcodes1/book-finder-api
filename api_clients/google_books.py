@@ -15,7 +15,7 @@ class GoogleBooksClient:
     TIMEOUT = 10
     MAX_RETRIES = 2
     MAX_RESULTS_PER_REQUEST = 40  # Google's limit per request
-    TOTAL_REQUESTS = 5  # Fetch 200 books total (5 * 40)
+    TOTAL_REQUESTS = 10  # Fetch 400 books total (10 * 40)
     
     def get_books_by_author(self, author_name: str) -> Dict[str, Any]:
         """
