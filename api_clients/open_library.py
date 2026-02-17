@@ -123,16 +123,8 @@ class OpenLibraryClient:
                 key = doc.get("key", "")
                 url = f"{self.BASE_URL}{key}" if key else self.BASE_URL
                 
-                # Get cover image from Open Library Covers API
-                thumbnail = None
-                if key:
-                    # Extract work/edition ID for cover
-                    key_parts = key.split('/')
-                    if len(key_parts) >= 3:
-                        id_type = key_parts[1]  # 'works' or 'books'
-                        id_value = key_parts[2]  # e.g., 'OL46125W'
-                        if id_type in ['works', 'books']:
-                            thumbnail = f"https://covers.openlibrary.org/b/olid/{id_value}-M.jpg"
+                # Get cover image using multiple methods
+                thumbnail = self._get_cover_url(doc, key)
                 
                 books.append(Book(
                     title=title.strip(),
@@ -161,5 +153,31 @@ class OpenLibraryClient:
                 return int(publish_years[0])
             except (ValueError, IndexError):
                 pass
+        
+        return None
+    
+    def _get_cover_url(self, doc: dict, key: str) -> Optional[str]:
+        """Extract cover URL from Open Library document using multiple methods."""
+        # Method 1: Use cover_i (cover ID) - most reliable
+        cover_id = doc.get("cover_i")
+        if cover_id:
+            return f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
+        
+        # Method 2: Use cover_edition_key (OLID)
+        cover_edition_key = doc.get("cover_edition_key")
+        if cover_edition_key:
+            return f"https://covers.openlibrary.org/b/olid/{cover_edition_key}-M.jpg"
+        
+        # Method 3: Use first edition_key from list
+        edition_keys = doc.get("edition_key", [])
+        if edition_keys and isinstance(edition_keys, list) and len(edition_keys) > 0:
+            return f"https://covers.openlibrary.org/b/olid/{edition_keys[0]}-M.jpg"
+        
+        # Method 4: Extract from work/book key
+        if key:
+            key_parts = key.split('/')
+            if len(key_parts) >= 3:
+                id_value = key_parts[2]  # e.g., 'OL46125W'
+                return f"https://covers.openlibrary.org/b/olid/{id_value}-M.jpg"
         
         return None

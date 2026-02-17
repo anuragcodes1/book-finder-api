@@ -127,16 +127,8 @@ class GoogleBooksClient:
                 if not url:
                     url = ""
                 
-                # Get thumbnail
-                thumbnail = None
-                image_links = volume_info.get("imageLinks", {})
-                if isinstance(image_links, dict):
-                    thumbnail = (
-                        image_links.get("thumbnail") or 
-                        image_links.get("smallThumbnail") or
-                        image_links.get("small") or
-                        image_links.get("medium")
-                    )
+                # Get cover image from imageLinks
+                thumbnail = self._get_cover_url(volume_info)
                 
                 books.append(Book(
                     title=title.strip(),
@@ -161,5 +153,20 @@ class GoogleBooksClient:
                 return int(year)
             except (ValueError, IndexError):
                 pass
+        
+        return None
+    
+    def _get_cover_url(self, volume_info: dict) -> Optional[str]:
+        """Extract cover URL from Google Books volume info."""
+        image_links = volume_info.get("imageLinks", {})
+        if not isinstance(image_links, dict):
+            return None
+        
+        # Try different sizes (prefer larger images)
+        for size in ["large", "medium", "small", "thumbnail", "smallThumbnail"]:
+            url = image_links.get(size)
+            if url:
+                # Upgrade to https if needed
+                return url.replace("http://", "https://")
         
         return None
