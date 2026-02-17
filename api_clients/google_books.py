@@ -127,11 +127,23 @@ class GoogleBooksClient:
                 if not url:
                     url = ""
                 
+                # Get thumbnail
+                thumbnail = None
+                image_links = volume_info.get("imageLinks", {})
+                if isinstance(image_links, dict):
+                    thumbnail = (
+                        image_links.get("thumbnail") or 
+                        image_links.get("smallThumbnail") or
+                        image_links.get("small") or
+                        image_links.get("medium")
+                    )
+                
                 books.append(Book(
                     title=title.strip(),
                     published_year=published_year,
                     url=url,
-                    source="google_books"
+                    source="google_books",
+                    thumbnail=thumbnail
                 ))
         
         except Exception as e:

@@ -123,11 +123,23 @@ class OpenLibraryClient:
                 key = doc.get("key", "")
                 url = f"{self.BASE_URL}{key}" if key else self.BASE_URL
                 
+                # Get cover image from Open Library Covers API
+                thumbnail = None
+                if key:
+                    # Extract work/edition ID for cover
+                    key_parts = key.split('/')
+                    if len(key_parts) >= 3:
+                        id_type = key_parts[1]  # 'works' or 'books'
+                        id_value = key_parts[2]  # e.g., 'OL46125W'
+                        if id_type in ['works', 'books']:
+                            thumbnail = f"https://covers.openlibrary.org/b/olid/{id_value}-M.jpg"
+                
                 books.append(Book(
                     title=title.strip(),
                     published_year=published_year,
                     url=url,
-                    source="open_library"
+                    source="open_library",
+                    thumbnail=thumbnail
                 ))
         
         except Exception as e:

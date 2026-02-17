@@ -43,7 +43,8 @@ def format_json(books: list[Book]) -> list[dict]:
             "title": book.title,
             "published_year": book.published_year,
             "url": book.url,
-            "source": book.source
+            "source": book.source,
+            "thumbnail": book.thumbnail
         }
         for book in books
     ]
