@@ -3,6 +3,12 @@
 A modular Python REST API to search for books by author using Open Library and Google Books APIs. Hosted on Railway.
 
 ## Features
+- Robust error handling with automatic retries
+- Graceful degradation when APIs fail
+- Input validation and sanitization
+- Comprehensive logging for debugging
+
+## Features
 
 - REST API for searching books by author name
 - Fetches data from both Open Library and Google Books APIs
