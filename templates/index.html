@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Finder - Search Books by Author</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        
+        .search-form {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            border-color: #667eea;
+        }
+        
+        .search-button {
+            padding: 15px 40px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .search-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .search-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            display: none;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results-header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .results-header h2 {
+            color: #333;
+            font-size: 1.8em;
+        }
+        
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .book-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .book-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .book-year {
+            color: #667eea;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .book-source {
+            display: inline-block;
+            padding: 5px 12px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .book-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+        
+        .book-link:hover {
+            transform: scale(1.05);
+        }
+        
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        .no-results {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Book Finder</h1>
+            <p>Search for books by author name</p>
+        </div>
+        
+        <div class="search-box">
+            <form class="search-form" id="searchForm">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="authorInput" 
+                    placeholder="Enter author name (e.g., Isaac Asimov, J.K. Rowling)"
+                    required
+                >
+                <button type="submit" class="search-button" id="searchButton">
+                    Search
+                </button>
+            </form>
+        </div>
+        
+        <div class="loading" id="loading">
+            🔍 Searching for books...
+        </div>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="results" id="results">
+            <div class="results-header">
+                <h2 id="resultsTitle"></h2>
+            </div>
+            <div class="book-grid" id="bookGrid"></div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('searchForm');
+        const authorInput = document.getElementById('authorInput');
+        const searchButton = document.getElementById('searchButton');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+        const resultsTitle = document.getElementById('resultsTitle');
+        const bookGrid = document.getElementById('bookGrid');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const author = authorInput.value.trim();
+            if (!author) return;
+            
+            // Reset UI
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            results.style.display = 'none';
+            searchButton.disabled = true;
+            bookGrid.innerHTML = '';
+            
+            try {
+                const response = await fetch(`/api/books?author=${encodeURIComponent(author)}`);
+                const data = await response.json();
+                
+                loading.style.display = 'none';
+                searchButton.disabled = false;
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch books');
+                }
+                
+                if (data.count === 0) {
+                    results.style.display = 'block';
+                    resultsTitle.textContent = `No books found for "${author}"`;
+                    bookGrid.innerHTML = '<div class="no-results">Try searching for another author</div>';
+                    return;
+                }
+                
+                // Display results
+                resultsTitle.textContent = `Found ${data.count} books by ${data.author}`;
+                results.style.display = 'block';
+                
+                data.books.forEach(book => {
+                    const card = document.createElement('div');
+                    card.className = 'book-card';
+                    
+                    const year = book.published_year || 'Unknown';
+                    const source = book.source === 'open_library' ? 'Open Library' : 'Google Books';
+                    
+                    card.innerHTML = `
+                        <div class="book-title">${escapeHtml(book.title)}</div>
+                        <div class="book-year">📅 ${year}</div>
+                        <div class="book-source">${source}</div>
+                        <a href="${escapeHtml(book.url)}" target="_blank" class="book-link">
+                            View Book →
+                        </a>
+                    `;
+                    
+                    bookGrid.appendChild(card);
+                });
+                
+            } catch (err) {
+                loading.style.display = 'none';
+                searchButton.disabled = false;
+                error.style.display = 'block';
+                error.textContent = `Error: ${err.message}`;
+            }
+        });
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

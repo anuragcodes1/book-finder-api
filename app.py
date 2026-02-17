@@ -1,6 +1,6 @@
 """Flask API for Book Finder."""
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from book_finder import search_books_by_author
 from utils.formatter import format_json
 import os
@@ -10,12 +10,19 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
+    """Home page with search UI."""
+    return render_template('index.html')
+
+
+@app.route('/api')
+def api_docs():
     """API documentation endpoint."""
     return jsonify({
         "name": "Book Finder API",
         "version": "1.0.0",
         "endpoints": {
-            "/": "API documentation",
+            "/": "Web UI for searching books",
+            "/api": "API documentation",
             "/health": "Health check",
             "/api/books": "Search books by author (GET with ?author=name)"
         },
