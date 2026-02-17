@@ -101,8 +101,8 @@ def get_books():
         books = result["books"]
         sources = result["sources"]
         
-        # Check if all sources failed (only Open Library now)
-        all_failed = sources_status.get("open_library", {}).get("status") == "error"
+        # Check if source failed (only Open Library now)
+        all_failed = sources.get("open_library", {}).get("status") == "error"
         
         if all_failed and len(books) == 0:
             return jsonify({
