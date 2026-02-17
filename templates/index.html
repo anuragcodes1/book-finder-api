@@ -276,6 +276,35 @@
             color: #666;
             font-size: 1.2em;
         }
+        
+        .pagination-controls {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .pagination-btn {
+            padding: 12px 30px;
+            font-size: 1em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: #ccc;
+        }
     </style>
 </head>
 <body>
@@ -324,12 +353,22 @@
         const resultsTitle = document.getElementById('resultsTitle');
         const bookGrid = document.getElementById('bookGrid');
         
+        let currentAuthor = '';
+        let currentPage = 1;
+        const booksPerPage = 50;
+        
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const author = authorInput.value.trim();
             if (!author) return;
             
+            currentAuthor = author;
+            currentPage = 1;
+            await loadBooks();
+        });
+        
+        async function loadBooks() {
             // Reset UI
             loading.style.display = 'block';
             error.style.display = 'none';
@@ -338,7 +377,7 @@
             bookGrid.innerHTML = '';
             
             try {
-                const response = await fetch(`/api/books?author=${encodeURIComponent(author)}`);
+                const response = await fetch(`/api/books?author=${encodeURIComponent(currentAuthor)}&page=${currentPage}&limit=${booksPerPage}`);
                 const data = await response.json();
                 
                 loading.style.display = 'none';
@@ -351,7 +390,9 @@
                     throw new Error(data.error || 'Failed to fetch books');
                 }
                 
-                if (data.count === 0) {
+                const pagination = data.pagination;
+                
+                if (pagination.total_books === 0) {
                     results.style.display = 'block';
                     
                     // Check if it's because all sources failed
@@ -364,16 +405,17 @@
                         }
                     }
                     
-                    resultsTitle.textContent = `No books found for "${author}"`;
+                    resultsTitle.textContent = `No books found for "${currentAuthor}"`;
                     bookGrid.innerHTML = '<div class="no-results">Try checking the spelling or searching for another author</div>';
                     return;
                 }
                 
-                // Display results with warning if partial
-                let titleText = `Found ${data.count} books by ${data.author}`;
+                // Display results with pagination info
+                let titleText = `Found ${pagination.total_books} books by ${data.author}`;
                 if (data.partial_results) {
                     titleText += ' ⚠️';
                 }
+                titleText += ` (Page ${pagination.page} of ${pagination.total_pages})`;
                 resultsTitle.textContent = titleText;
                 
                 // Show warning message if some sources failed
@@ -425,13 +467,55 @@
                     bookGrid.appendChild(card);
                 });
                 
+                // Add pagination controls
+                addPaginationControls(pagination);
+                
             } catch (err) {
                 loading.style.display = 'none';
                 searchButton.disabled = false;
                 error.style.display = 'block';
                 error.textContent = `Error: ${err.message}`;
             }
-        });
+        }
+        
+        function addPaginationControls(pagination) {
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination-controls';
+            paginationDiv.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 30px; padding: 20px;';
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '← Previous';
+            prevBtn.className = 'pagination-btn';
+            prevBtn.disabled = !pagination.has_prev;
+            prevBtn.onclick = () => {
+                currentPage--;
+                loadBooks();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            
+            // Page info
+            const pageInfo = document.createElement('span');
+            pageInfo.textContent = `Page ${pagination.page} of ${pagination.total_pages}`;
+            pageInfo.style.cssText = 'font-weight: 600; color: #333; font-size: 1.1em;';
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next →';
+            nextBtn.className = 'pagination-btn';
+            nextBtn.disabled = !pagination.has_next;
+            nextBtn.onclick = () => {
+                currentPage++;
+                loadBooks();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            
+            paginationDiv.appendChild(prevBtn);
+            paginationDiv.appendChild(pageInfo);
+            paginationDiv.appendChild(nextBtn);
+            
+            bookGrid.parentElement.appendChild(paginationDiv);
+        }
         
         function escapeHtml(text) {
             const div = document.createElement('div');

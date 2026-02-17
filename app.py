@@ -52,21 +52,41 @@ def health():
 @app.route('/api/books', methods=['GET'])
 def get_books():
     """
-    Get books by author.
+    Get books by author with pagination support.
     
     Query Parameters:
         author (str): The name of the author to search for
+        page (int): Page number (default: 1)
+        limit (int): Books per page (default: 50, max: 100)
         
     Returns:
-        JSON response with books list
+        JSON response with paginated books list
     """
     author_name = request.args.get('author', '').strip()
     
     if not author_name:
         return jsonify({
             "error": "Missing required parameter: author",
-            "usage": "/api/books?author=Author Name"
+            "usage": "/api/books?author=Author Name&page=1&limit=50"
         }), 400
+    
+    # Get pagination parameters
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        return jsonify({
+            "error": "Invalid pagination parameters",
+            "message": "page and limit must be integers"
+        }), 400
+    
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if limit < 1:
+        limit = 50
+    if limit > 100:
+        limit = 100
     
     try:
         result = search_books_by_author(author_name)
@@ -95,11 +115,27 @@ def get_books():
                 "message": "Please try again later"
             }), 503
         
-        # Build response with warnings if some sources failed
+        # Calculate pagination
+        total_books = len(books)
+        total_pages = (total_books + limit - 1) // limit  # Ceiling division
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        
+        # Get paginated books
+        paginated_books = books[start_idx:end_idx]
+        
+        # Build response with pagination info
         response = {
             "author": author_name,
-            "count": len(books),
-            "books": format_json(books),
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total_books": total_books,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            },
+            "books": format_json(paginated_books),
             "sources": sources
         }
         

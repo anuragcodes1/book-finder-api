@@ -15,6 +15,7 @@ class OpenLibraryClient:
     SEARCH_URL = f"{BASE_URL}/search.json"
     TIMEOUT = 10
     MAX_RETRIES = 2
+    MAX_RESULTS = 500  # Open Library's maximum
     
     def get_books_by_author(self, author_name: str) -> Dict[str, Any]:
         """
@@ -30,7 +31,7 @@ class OpenLibraryClient:
             try:
                 params = {
                     "author": author_name,
-                    "limit": 100
+                    "limit": self.MAX_RESULTS
                 }
                 
                 response = requests.get(
