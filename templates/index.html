@@ -255,18 +255,45 @@
                 searchButton.disabled = false;
                 
                 if (!response.ok) {
+                    if (response.status === 503) {
+                        throw new Error('All book sources are currently unavailable. Please try again later.');
+                    }
                     throw new Error(data.error || 'Failed to fetch books');
                 }
                 
                 if (data.count === 0) {
                     results.style.display = 'block';
+                    
+                    // Check if it's because all sources failed
+                    if (data.sources) {
+                        const allFailed = Object.values(data.sources).every(s => s.status === 'error');
+                        if (allFailed) {
+                            resultsTitle.textContent = 'Service Temporarily Unavailable';
+                            bookGrid.innerHTML = '<div class="no-results">All book sources are currently unavailable. Please try again later.</div>';
+                            return;
+                        }
+                    }
+                    
                     resultsTitle.textContent = `No books found for "${author}"`;
-                    bookGrid.innerHTML = '<div class="no-results">Try searching for another author</div>';
+                    bookGrid.innerHTML = '<div class="no-results">Try checking the spelling or searching for another author</div>';
                     return;
                 }
                 
-                // Display results
-                resultsTitle.textContent = `Found ${data.count} books by ${data.author}`;
+                // Display results with warning if partial
+                let titleText = `Found ${data.count} books by ${data.author}`;
+                if (data.partial_results) {
+                    titleText += ' ⚠️';
+                }
+                resultsTitle.textContent = titleText;
+                
+                // Show warning message if some sources failed
+                if (data.warning) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.style.cssText = 'background: #fff3cd; color: #856404; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffc107;';
+                    warningDiv.innerHTML = `<strong>⚠️ Partial Results:</strong> ${escapeHtml(data.warning)}`;
+                    bookGrid.parentElement.insertBefore(warningDiv, bookGrid);
+                }
+                
                 results.style.display = 'block';
                 
                 data.books.forEach(book => {
