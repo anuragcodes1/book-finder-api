@@ -1,12 +1,16 @@
 # Book Finder API
 
-A modular Python REST API to search for books by author using Open Library and Google Books APIs. Hosted on Railway.
+A modular Python REST API to search for books by author using the Open Library API. Hosted on Railway.
 
 ## Features
+- Fetches ALL books using proper pagination (no arbitrary limits)
 - Robust error handling with automatic retries
-- Graceful degradation when APIs fail
+- Graceful degradation when API fails
 - Input validation and sanitization
 - Comprehensive logging for debugging
+- Book cover images from Open Library
+- Backend pagination (50 books per page)
+- Consistent results with caching
 
 ## Features
 

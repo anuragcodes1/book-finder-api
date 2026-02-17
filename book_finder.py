@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 """
-Book Finder - Search for books by author using Open Library and Google Books APIs
+Book Finder - Search for books by author using Open Library API
 """
 
 import logging
+import hashlib
 from typing import Dict, Any
 from api_clients.open_library import OpenLibraryClient
-from api_clients.google_books import GoogleBooksClient
 from models.book import Book
 from utils.formatter import format_results
 
 logger = logging.getLogger(__name__)
 
+# Simple in-memory cache for consistent results
+_cache = {}
 
-def search_books_by_author(author_name: str) -> Dict[str, Any]:
+
+def _get_cache_key(author_name: str) -> str:
+    """Generate cache key for author."""
+    return hashlib.md5(author_name.lower().strip().encode()).hexdigest()
+
+
+def search_books_by_author(author_name: str, use_cache: bool = True) -> Dict[str, Any]:
     """
     Search for books by author using multiple APIs.
     
@@ -33,6 +41,12 @@ def search_books_by_author(author_name: str) -> Dict[str, Any]:
     
     author_name = author_name.strip()
     
+    # Check cache first
+    cache_key = _get_cache_key(author_name)
+    if use_cache and cache_key in _cache:
+        logger.info(f"Returning cached results for {author_name}")
+        return _cache[cache_key]
+    
     # Validate length
     if len(author_name) < 2:
         return {
@@ -51,7 +65,7 @@ def search_books_by_author(author_name: str) -> Dict[str, Any]:
     all_books = []
     sources_status = {}
     
-    # Fetch from Open Library
+    # Fetch from Open Library only
     try:
         open_library = OpenLibraryClient()
         ol_result = open_library.get_books_by_author(author_name)
@@ -70,48 +84,55 @@ def search_books_by_author(author_name: str) -> Dict[str, Any]:
             "error": "Service unavailable"
         }
     
-    # Fetch from Google Books
-    try:
-        google_books = GoogleBooksClient()
-        gb_result = google_books.get_books_by_author(author_name)
-        all_books.extend(gb_result["books"])
-        sources_status["google_books"] = {
-            "status": gb_result["status"],
-            "count": len(gb_result["books"])
-        }
-        if gb_result["status"] == "error":
-            sources_status["google_books"]["error"] = gb_result.get("error", "Unknown error")
-    except Exception as e:
-        logger.error(f"Unexpected error calling Google Books: {e}")
-        sources_status["google_books"] = {
-            "status": "error",
-            "count": 0,
-            "error": "Service unavailable"
-        }
-    
-    # Remove duplicates based on title similarity
-    unique_books = _deduplicate_books(all_books)
+    # No deduplication needed since we only have one source
+    unique_books = all_books
     
     # Sort by publication year
     sorted_books = sorted(unique_books, key=lambda x: x.published_year or 0, reverse=True)
     
-    return {
+    result = {
         "books": sorted_books,
         "sources": sources_status
     }
+    
+    # Cache the result
+    if use_cache:
+        _cache[cache_key] = result
+        logger.info(f"Cached results for {author_name}: {len(sorted_books)} books")
+    
+    return result
 
 
 def _deduplicate_books(books: list[Book]) -> list[Book]:
-    """Remove duplicate books based on title similarity."""
+    """
+    Remove duplicate books based on title and year similarity.
+    Uses consistent ordering to ensure same results every time.
+    """
     seen = {}
     unique = []
     
-    for book in books:
-        normalized_title = book.title.lower().strip()
-        if normalized_title not in seen:
-            seen[normalized_title] = True
-            unique.append(book)
+    # Sort books first for consistent ordering (by source, then title)
+    # This ensures same input always produces same output
+    sorted_books = sorted(books, key=lambda x: (x.source, x.title.lower(), x.published_year or 0))
     
+    for book in sorted_books:
+        # Normalize title for comparison
+        normalized_title = book.title.lower().strip()
+        # Remove common punctuation and extra spaces
+        normalized_title = ' '.join(normalized_title.split())
+        
+        # Create a key combining title and year for better deduplication
+        # Books with same title but different years are likely different editions
+        year_key = book.published_year if book.published_year else "unknown"
+        dedup_key = f"{normalized_title}|{year_key}"
+        
+        if dedup_key not in seen:
+            seen[dedup_key] = True
+            unique.append(book)
+        else:
+            logger.debug(f"Duplicate found: {book.title} ({book.published_year}) from {book.source}")
+    
+    logger.info(f"Deduplication: {len(books)} -> {len(unique)} books ({len(books) - len(unique)} duplicates removed)")
     return unique
 
 

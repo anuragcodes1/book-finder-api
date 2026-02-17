@@ -15,11 +15,11 @@ class OpenLibraryClient:
     SEARCH_URL = f"{BASE_URL}/search.json"
     TIMEOUT = 10
     MAX_RETRIES = 2
-    MAX_RESULTS = 500  # Open Library's maximum
+    RESULTS_PER_PAGE = 100  # Fetch 100 per request for efficiency
     
     def get_books_by_author(self, author_name: str) -> Dict[str, Any]:
         """
-        Fetch books by author from Open Library.
+        Fetch ALL books by author from Open Library using pagination.
         
         Args:
             author_name: The name of the author
@@ -27,76 +27,140 @@ class OpenLibraryClient:
         Returns:
             Dictionary with 'books' list and 'status' info
         """
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                params = {
-                    "author": author_name,
-                    "limit": self.MAX_RESULTS
-                }
-                
-                response = requests.get(
-                    self.SEARCH_URL, 
-                    params=params, 
-                    timeout=self.TIMEOUT
-                )
-                response.raise_for_status()
-                
-                # Safely parse JSON
+        all_books = []
+        offset = 0
+        total_found = None
+        
+        while True:
+            for attempt in range(self.MAX_RETRIES):
                 try:
-                    data = response.json()
-                except ValueError as e:
-                    logger.error(f"Open Library returned invalid JSON: {e}")
+                    params = {
+                        "author": author_name,
+                        "limit": self.RESULTS_PER_PAGE,
+                        "offset": offset
+                    }
+                    
+                    response = requests.get(
+                        self.SEARCH_URL, 
+                        params=params, 
+                        timeout=self.TIMEOUT
+                    )
+                    response.raise_for_status()
+                    
+                    # Safely parse JSON
+                    try:
+                        data = response.json()
+                    except ValueError as e:
+                        logger.error(f"Open Library returned invalid JSON: {e}")
+                        if len(all_books) > 0:
+                            # Return what we have so far
+                            break
+                        return {
+                            "books": [],
+                            "status": "error",
+                            "error": "Invalid response format"
+                        }
+                    
+                    # Get total number of results on first request
+                    if total_found is None:
+                        total_found = data.get("numFound", 0)
+                        logger.info(f"Open Library: Found {total_found} total books for {author_name}")
+                    
+                    # Parse books from this page
+                    books = self._parse_response(data)
+                    
+                    if not books:
+                        # No more results
+                        logger.info(f"Open Library: Finished fetching at offset {offset}, total: {len(all_books)}")
+                        break
+                    
+                    all_books.extend(books)
+                    logger.info(f"Open Library: Fetched {len(books)} books at offset {offset}, total so far: {len(all_books)}")
+                    
+                    # Check if we've fetched everything
+                    if len(all_books) >= total_found or len(books) < self.RESULTS_PER_PAGE:
+                        logger.info(f"Open Library: Completed fetching all {len(all_books)} books")
+                        break
+                    
+                    # Move to next page
+                    offset += self.RESULTS_PER_PAGE
+                    break  # Success, move to next page
+                
+                except requests.Timeout:
+                    logger.warning(f"Open Library timeout at offset {offset} (attempt {attempt + 1}/{self.MAX_RETRIES})")
+                    if attempt == self.MAX_RETRIES - 1:
+                        if len(all_books) > 0:
+                            # Return what we have
+                            logger.info(f"Open Library: Returning {len(all_books)} books after timeout")
+                            return {
+                                "books": all_books,
+                                "status": "partial",
+                                "error": "Request timeout, partial results"
+                            }
+                        return {
+                            "books": [],
+                            "status": "error",
+                            "error": "Request timeout"
+                        }
+                
+                except requests.ConnectionError as e:
+                    logger.error(f"Open Library connection error at offset {offset}: {e}")
+                    if len(all_books) > 0:
+                        return {
+                            "books": all_books,
+                            "status": "partial",
+                            "error": "Connection failed, partial results"
+                        }
                     return {
                         "books": [],
                         "status": "error",
-                        "error": "Invalid response format"
+                        "error": "Connection failed"
                     }
                 
-                books = self._parse_response(data)
-                return {
-                    "books": books,
-                    "status": "success",
-                    "count": len(books)
-                }
-            
-            except requests.Timeout:
-                logger.warning(f"Open Library timeout (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                if attempt == self.MAX_RETRIES - 1:
+                except requests.HTTPError as e:
+                    status_code = e.response.status_code if e.response else None
+                    logger.error(f"Open Library HTTP error {status_code} at offset {offset}: {e}")
+                    if len(all_books) > 0:
+                        return {
+                            "books": all_books,
+                            "status": "partial",
+                            "error": f"API error (HTTP {status_code}), partial results"
+                        }
                     return {
                         "books": [],
                         "status": "error",
-                        "error": "Request timeout"
+                        "error": f"API error (HTTP {status_code})"
+                    }
+                
+                except Exception as e:
+                    logger.error(f"Unexpected error with Open Library at offset {offset}: {e}")
+                    if len(all_books) > 0:
+                        return {
+                            "books": all_books,
+                            "status": "partial",
+                            "error": "Unexpected error, partial results"
+                        }
+                    return {
+                        "books": [],
+                        "status": "error",
+                        "error": "Unexpected error"
                     }
             
-            except requests.ConnectionError as e:
-                logger.error(f"Open Library connection error: {e}")
-                return {
-                    "books": [],
-                    "status": "error",
-                    "error": "Connection failed"
-                }
-            
-            except requests.HTTPError as e:
-                status_code = e.response.status_code if e.response else None
-                logger.error(f"Open Library HTTP error {status_code}: {e}")
-                return {
-                    "books": [],
-                    "status": "error",
-                    "error": f"API error (HTTP {status_code})"
-                }
-            
-            except Exception as e:
-                logger.error(f"Unexpected error with Open Library: {e}")
-                return {
-                    "books": [],
-                    "status": "error",
-                    "error": "Unexpected error"
-                }
+            # Break outer loop if we're done or hit an error
+            if not books or len(all_books) >= (total_found or 0):
+                break
+        
+        if len(all_books) == 0:
+            return {
+                "books": [],
+                "status": "success",
+                "count": 0
+            }
         
         return {
-            "books": [],
-            "status": "error",
-            "error": "Max retries exceeded"
+            "books": all_books,
+            "status": "success",
+            "count": len(all_books)
         }
     
     def _parse_response(self, data: dict) -> list[Book]:

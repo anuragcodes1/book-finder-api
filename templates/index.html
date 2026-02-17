@@ -395,14 +395,11 @@
                 if (pagination.total_books === 0) {
                     results.style.display = 'block';
                     
-                    // Check if it's because all sources failed
-                    if (data.sources) {
-                        const allFailed = Object.values(data.sources).every(s => s.status === 'error');
-                        if (allFailed) {
-                            resultsTitle.textContent = 'Service Temporarily Unavailable';
-                            bookGrid.innerHTML = '<div class="no-results">All book sources are currently unavailable. Please try again later.</div>';
-                            return;
-                        }
+                    // Check if it's because source failed
+                    if (data.sources && data.sources.open_library && data.sources.open_library.status === 'error') {
+                        resultsTitle.textContent = 'Service Temporarily Unavailable';
+                        bookGrid.innerHTML = '<div class="no-results">Open Library is currently unavailable. Please try again later.</div>';
+                        return;
                     }
                     
                     resultsTitle.textContent = `No books found for "${currentAuthor}"`;
@@ -433,7 +430,7 @@
                     card.className = 'book-card';
                     
                     const year = book.published_year || 'Unknown';
-                    const source = book.source === 'open_library' ? 'Open Library' : 'Google Books';
+                    const source = 'Open Library';
                     
                     // Generate cover URL
                     const coverUrl = getCoverUrl(book);

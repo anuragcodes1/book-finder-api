@@ -101,15 +101,12 @@ def get_books():
         books = result["books"]
         sources = result["sources"]
         
-        # Check if all sources failed
-        all_failed = all(
-            source.get("status") == "error" 
-            for source in sources.values()
-        )
+        # Check if all sources failed (only Open Library now)
+        all_failed = sources_status.get("open_library", {}).get("status") == "error"
         
         if all_failed and len(books) == 0:
             return jsonify({
-                "error": "All book sources are currently unavailable",
+                "error": "Open Library is currently unavailable",
                 "author": author_name,
                 "sources": sources,
                 "message": "Please try again later"
@@ -139,14 +136,9 @@ def get_books():
             "sources": sources
         }
         
-        # Add warning if some sources failed
-        failed_sources = [
-            name for name, info in sources.items() 
-            if info.get("status") == "error"
-        ]
-        
-        if failed_sources:
-            response["warning"] = f"Some sources unavailable: {', '.join(failed_sources)}"
+        # Add warning if source failed
+        if sources.get("open_library", {}).get("status") == "error":
+            response["warning"] = "Open Library unavailable"
             response["partial_results"] = True
         
         return jsonify(response), 200
